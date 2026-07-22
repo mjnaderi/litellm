@@ -23,6 +23,13 @@ interface OAuthFormFieldsProps {
 
 const fieldClassName = "rounded-lg border-gray-300 focus:border-blue-500 focus:ring-blue-500";
 
+const UPSTREAM_RESOURCE_TOOLTIP =
+  "RFC 8707 resource indicator sent to the authorization server so it mints a token audienced for this MCP server. " +
+  "Leave blank to send nothing, which is the default and what most providers expect. Use 'auto' to send this server's " +
+  "own URL. Set an exact identifier when the authorization server expects a specific one. Some providers reject this " +
+  "parameter and take the audience from scopes instead; if you see AADSTS901002, leave it blank. If you see " +
+  "invalid_target, the authorization server needs it set.";
+
 const FieldLabel: React.FC<{ label: string; tooltip: string }> = ({ label, tooltip }) => (
   <span className="text-sm font-medium text-gray-700 flex items-center">
     {label}
@@ -30,6 +37,20 @@ const FieldLabel: React.FC<{ label: string; tooltip: string }> = ({ label, toolt
       <InfoCircleOutlined className="ml-2 text-blue-400 hover:text-blue-600 cursor-help" />
     </Tooltip>
   </span>
+);
+
+// Stored credentials are redacted out of server responses, so on edit this renders blank even when a
+// value is saved, and a blank submit means keep-existing. Say so, the way the client app fields do.
+const UpstreamResourceField: React.FC<{ isEditing: boolean }> = ({ isEditing }) => (
+  <Form.Item
+    label={<FieldLabel label="Resource Indicator (optional)" tooltip={UPSTREAM_RESOURCE_TOOLTIP} />}
+    name={["credentials", "upstream_resource"]}
+  >
+    <TextInput
+      placeholder={`auto, or https://mcp.example.com/mcp${isEditing ? " (leave blank to keep existing)" : ""}`}
+      className={fieldClassName}
+    />
+  </Form.Item>
 );
 
 const OAuthFormFields: React.FC<OAuthFormFieldsProps> = ({
@@ -114,6 +135,7 @@ const OAuthFormFields: React.FC<OAuthFormFieldsProps> = ({
           >
             <Select mode="tags" tokenSeparators={[","]} placeholder="Add scopes" className="rounded-lg" size="large" />
           </Form.Item>
+          <UpstreamResourceField isEditing={isEditing} />
         </>
       ) : (
         <>
@@ -167,6 +189,7 @@ const OAuthFormFields: React.FC<OAuthFormFieldsProps> = ({
           >
             <Select mode="tags" tokenSeparators={[","]} placeholder="Add scopes" className="rounded-lg" size="large" />
           </Form.Item>
+          <UpstreamResourceField isEditing={isEditing} />
           <Form.Item
             label={
               <FieldLabel

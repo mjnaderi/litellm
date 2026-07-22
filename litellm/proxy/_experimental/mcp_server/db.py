@@ -1248,11 +1248,12 @@ def _decrypted_credential_field(creds: Dict[str, object], field: str) -> object:
 
 def mcp_oauth_token_identity(server: object) -> tuple[object, ...]:
     """The upstream-OAuth-token-determining fields of an MCP server: the resource/audience (url, or
-    spec_path for OpenAPI servers), the OAuth mode/grant (auth_type, oauth2_flow), the
-    authorization-server endpoints, and the OAuth client + scopes. Mirrors the dashboard's
-    getOAuthAuthorizationIdentity. When any of these change on a server update, previously stored
-    per-user tokens were minted for the old identity and are stale. Excludes transport and
-    delegate_auth_to_upstream, which do not affect what token is minted (RFC 8707/8693).
+    spec_path for OpenAPI servers, plus the RFC 8707 upstream_resource sent on the authorize and
+    token legs), the OAuth mode/grant (auth_type, oauth2_flow), the authorization-server endpoints,
+    and the OAuth client + scopes. Mirrors the dashboard's getOAuthAuthorizationIdentity. When any
+    of these change on a server update, previously stored per-user tokens were minted for the old
+    identity and are stale. Excludes transport and delegate_auth_to_upstream, which do not affect
+    what token is minted (RFC 8693).
 
     client_id/client_secret are compared decrypted: stored values are NaCl-encrypted with a fresh
     nonce on every write, so comparing ciphertext would flag every routine save as an identity
@@ -1278,6 +1279,7 @@ def mcp_oauth_token_identity(server: object) -> tuple[object, ...]:
         _decrypted_credential_field(creds_dict, "client_id"),
         _decrypted_credential_field(creds_dict, "client_secret"),
         creds_dict.get("scopes"),
+        creds_dict.get("upstream_resource"),
     )
 
 

@@ -8,6 +8,7 @@ import {
   getOAuthAuthorizationIdentity,
   CLEARED_ON_INVALIDATION,
   isHeldOAuthTokenStale,
+  preservedAdminCredentials,
   preservedDeclaredAppCredentials,
   withoutMintedTokenCredentials,
   OAUTH_FLOW,
@@ -194,7 +195,7 @@ const MCPServerEdit: React.FC<MCPServerEditProps> = ({
         transport,
         auth_type: isClientForwardedTokenMode(values.auth_type) ? values.auth_type : AUTH_TYPE.OAUTH2,
         credentials: isClientForwardedTokenMode(values.auth_type)
-          ? preservedDeclaredAppCredentials(values.credentials)
+          ? preservedAdminCredentials(values.credentials)
           : values.credentials,
         mcp_access_groups: values.mcp_access_groups || mcpServer.mcp_access_groups,
         static_headers: staticHeaders,
@@ -225,7 +226,7 @@ const MCPServerEdit: React.FC<MCPServerEditProps> = ({
 
       const current = (form.getFieldValue("credentials") as Record<string, unknown> | undefined) ?? {};
       const nextCredentials = {
-        ...(preservedDeclaredAppCredentials(current) ?? {}),
+        ...(preservedAdminCredentials(current) ?? {}),
         ...(current.scopes !== undefined && { scopes: current.scopes }),
         access_token: token.access_token,
         ...(token.refresh_token && { refresh_token: token.refresh_token }),
@@ -451,10 +452,10 @@ const MCPServerEdit: React.FC<MCPServerEditProps> = ({
     resetOAuthFlow();
     // The admin-typed app is upstream-scoped config, not minted material, so it survives every
     // invalidation; only the held token is discarded. Token-shaped keys are excluded by the filter.
-    const keptAppCredentials = preservedDeclaredAppCredentials(form.getFieldValue("credentials"));
+    const keptAdminCredentials = preservedAdminCredentials(form.getFieldValue("credentials"));
     form.resetFields([...CLEARED_ON_INVALIDATION]);
-    if (keptAppCredentials) {
-      form.setFieldsValue({ credentials: keptAppCredentials });
+    if (keptAdminCredentials) {
+      form.setFieldsValue({ credentials: keptAdminCredentials });
     }
     const preserved = Object.fromEntries(
       CLEARED_ON_INVALIDATION.filter((key) => key in changedValues).map((key) => [key, changedValues[key]]),
@@ -928,7 +929,7 @@ const MCPServerEdit: React.FC<MCPServerEditProps> = ({
       // Client-forwarded rows persist ONLY the declared app; strip any token material lingering in the
       // form (e.g. from a prior oauth2 authorize this session) so it can never reach the row.
       const submitCredentials = isClientForwardedTokenMode(restValues.auth_type)
-        ? preservedDeclaredAppCredentials(credentialsPayload)
+        ? preservedAdminCredentials(credentialsPayload)
         : credentialsPayload;
 
       if (includeCredentials && submitCredentials && Object.keys(submitCredentials).length > 0) {

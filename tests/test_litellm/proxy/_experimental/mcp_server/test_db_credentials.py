@@ -95,6 +95,17 @@ def _identity_server(**overrides):
         {"credentials": {"client_id": "new", "client_secret": "csec", "scopes": ["a"]}},
         {"credentials": {"client_id": "cid", "client_secret": "rotated", "scopes": ["a"]}},
         {"credentials": {"client_id": "cid", "client_secret": "csec", "scopes": ["b"]}},
+        # RFC 8707: upstream_resource is the audience the token is minted for, so changing it
+        # alone strands every stored per-user token on the previous audience.
+        {"credentials": {"client_id": "cid", "client_secret": "csec", "scopes": ["a"], "upstream_resource": "auto"}},
+        {
+            "credentials": {
+                "client_id": "cid",
+                "client_secret": "csec",
+                "scopes": ["a"],
+                "upstream_resource": "api://new-audience",
+            }
+        },
     ],
 )
 def test_mcp_oauth_token_identity_changes_on_mint_relevant_fields(overrides):
@@ -1067,3 +1078,28 @@ async def test_delete_mcp_server_cleans_oauth_client_store():
     await delete_mcp_server(prisma, "s1", invalidate_token_cache=AsyncMock())
 
     prisma.db.litellm_mcpserveroauthclient.delete_many.assert_awaited_once_with(where={"server_id": "s1"})
+
+
+def test_mcp_oauth_token_identity_changes_when_only_upstream_resource_is_edited():
+    """A resource-only update must purge stored per-user tokens.
+
+    Changing ``upstream_resource`` changes the audience the next token is minted for, so every
+    token already stored for this server was minted for the old (or unbounded) audience. Without
+    this field in the identity, an administrator retargeting a server leaves authenticated users
+    calling tools with the previous audience's token until it expires, which is the token-reuse
+    RFC 8707 exists to stop.
+    """
+    from litellm.proxy._experimental.mcp_server.db import mcp_oauth_token_identity
+
+    creds = {"client_id": "cid", "client_secret": "csec", "scopes": ["a"]}
+    unset = _identity_server(credentials=dict(creds))
+    set_to_auto = _identity_server(credentials={**creds, "upstream_resource": "auto"})
+    set_to_explicit = _identity_server(credentials={**creds, "upstream_resource": "api://audience-one"})
+    retargeted = _identity_server(credentials={**creds, "upstream_resource": "api://audience-two"})
+
+    assert mcp_oauth_token_identity(unset) != mcp_oauth_token_identity(set_to_auto)
+    assert mcp_oauth_token_identity(unset) != mcp_oauth_token_identity(set_to_explicit)
+    assert mcp_oauth_token_identity(set_to_explicit) != mcp_oauth_token_identity(retargeted)
+    assert mcp_oauth_token_identity(set_to_explicit) == mcp_oauth_token_identity(
+        _identity_server(credentials={**creds, "upstream_resource": "api://audience-one"})
+    )
